@@ -195,25 +195,39 @@
             text-align: center;
             padding-top: 35px;
             box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .tombstone .rip {
+            font-family: "Courier New", Courier, monospace;
+            font-size: 16px;
+            font-weight: 900;
+            color: #111;
+            text-shadow: 1px 1px 1px #777, -1px -1px 1px #222;
+            margin-bottom: 8px;
         }
 
         .tombstone h1 {
             margin: 0;
             font-family: "Courier New", Courier, monospace;
-            font-size: 38px;
-            letter-spacing: 2px;
+            font-size: 19px;
+            line-height: 1.1;
+            letter-spacing: 1px;
             color: #111;
             text-shadow: 1px 1px 1px #777, -1px -1px 1px #222;
+            padding: 0 5px;
+            word-wrap: break-word;
         }
 
         .tombstone p {
-            margin: 10px 0 0 0;
+            margin: 8px 0 0 0;
             font-family: "Courier New", Courier, monospace;
             font-size: 14px;
             font-weight: bold;
             color: #111;
             text-shadow: 1px 1px 1px #777;
-            line-height: 1.4;
         }
 
         .crack {
@@ -240,15 +254,17 @@
         /* === COFFIN === */
         .coffin-wrapper {
             position: absolute;
-            bottom: -220px; 
+            bottom: -350px; 
             left: 140px;
             width: 120px;
             height: 220px;
             z-index: 3;
-            transition: bottom 3s cubic-bezier(0.25, 0.1, 0.25, 1);
+            opacity: 0; /* Полностью скрыт в начале */
+            transition: bottom 3s cubic-bezier(0.25, 0.1, 0.25, 1), opacity 0.5s ease-in;
             display: flex;
             justify-content: center;
             align-items: center;
+            pointer-events: none;
         }
 
         .coffin-shape {
@@ -404,7 +420,6 @@
         /* === JUMPSCARE / IMAGE ROULETTE === */
         #jumpscare {
             position: fixed;
-            /* Делаем чуть больше 100% чтобы при тряске не было видно краев */
             top: -5vh; left: -5vw; width: 110vw; height: 110vh;
             background: #000;
             z-index: 2000;
@@ -421,7 +436,7 @@
         #scary-image {
             width: 100%;
             height: 100%;
-            object-fit: contain; /* Чтобы картинка влезла целиком */
+            object-fit: contain; 
             pointer-events: none;
         }
 
@@ -462,8 +477,9 @@
             
             <div class="tombstone" id="tombstone">
                 <div class="crack"></div>
-                <h1>R.I.P</h1>
-                <p>НЕ<br>БЕСПОКОИТЬ</p>
+                <div class="rip">R.I.P</div>
+                <h1 id="grave-name">???</h1>
+                <p id="grave-date">??.??.????</p>
             </div>
 
             <div class="coffin-wrapper coffin-shape" id="coffin">
@@ -499,6 +515,24 @@
     </div>
 
     <script>
+        // === БАЗА ДАННЫХ РЕАЛЬНЫХ ЛЮДЕЙ (Известные/странные случаи смерти) ===
+        const deadPeople = [
+            { name: "Элиза Лэм", date: "19.02.2013" },       // Найдена в баке для воды на крыше отеля Сесил
+            { name: "Гарри Хой", date: "09.07.1993" },       // Выпал из окна, проверяя стекло на прочность
+            { name: "Франц Райхельт", date: "04.02.1912" },  // Прыгнул с Эйфелевой башни с самодельным парашютом
+            { name: "Айседора Дункан", date: "14.09.1927" }, // Шарф намотался на колесо автомобиля
+            { name: "Глория Рамирес", date: "19.02.1994" },  // "Токсичная леди", заразившая врачей скорой помощи
+            { name: "Игорь Дятлов", date: "02.02.1959" },    // Перевал Дятлова
+            { name: "Роберт Уильямс", date: "25.01.1979" },  // Первый человек, убитый роботом (на заводе Форд)
+            { name: "Влад. Комаров", date: "24.04.1967" },   // Космонавт, разбившийся из-за отказа парашюта капсулы
+            { name: "Григ. Распутин", date: "30.12.1916" }   // Отравлен, застрелен и утоплен
+        ];
+
+        // Заполняем случайным человеком при загрузке
+        const victim = deadPeople[Math.floor(Math.random() * deadPeople.length)];
+        document.getElementById('grave-name').innerText = victim.name;
+        document.getElementById('grave-date').innerText = victim.date;
+
         // === МАССИВЫ ИЗОБРАЖЕНИЙ ===
         const funnyImages = [
             "https://i.pinimg.com/736x/08/3f/7e/083f7e20390cca811edce8784d1e6583.jpg",
@@ -533,23 +567,18 @@
 
         // === ЛОГИКА ПРЕДУПРЕЖДЕНИЯ И ПРЕДЗАГРУЗКИ ===
         function acceptWarning() {
-            // Убираем экран предупреждения
             document.getElementById('warning-screen').style.display = 'none';
             
-            // Выбираем случайную категорию, затем случайную картинку из неё
             const categories = [funnyImages, scaryImages, disturbingImages];
             const randomCategory = categories[Math.floor(Math.random() * categories.length)];
             selectedImageUrl = randomCategory[Math.floor(Math.random() * randomCategory.length)];
 
-            // Предзагружаем картинку в фоне, чтобы в момент скримера не было белого экрана
             const imgPreload = new Image();
             imgPreload.src = selectedImageUrl;
-            
-            // Вставляем её в наш элемент скримера
             document.getElementById('scary-image').src = selectedImageUrl;
         }
 
-        // === ОСНОВНАЯ АНИМАЦИЯ (Без изменений таймингов!) ===
+        // === ОСНОВНАЯ АНИМАЦИЯ ===
         let isOpening = false;
 
         function startSimulation() {
@@ -583,10 +612,12 @@
                 grassElements.forEach(g => g.style.animation = 'rumble 0.1s infinite');
             }, 600);
 
-            // 3. Гроб медленно поднимается
+            // 3. Гроб появляется из темноты и медленно поднимается
             setTimeout(() => {
                 dirt.style.animation = 'rumble 0.3s infinite';
                 tombstone.style.animation = 'rumble 0.4s infinite';
+                
+                coffin.style.opacity = '1'; 
                 coffin.style.bottom = '40px'; 
             }, 3000);
 
@@ -615,25 +646,28 @@
 
             // 8. СКРИМЕР (РУЛЕТКА КАРТИНОК)
             setTimeout(() => {
-                // Выключаем молнии
                 lightning.style.display = 'none';
                 
-                // Включаем слой со случайной картинкой
                 document.body.style.backgroundColor = '#000';
                 jumpscare.classList.add('active');
 
-                // Эффект стробоскопа на фоне
+                // Эффект стробоскопа
                 let isRed = false;
                 let flashInterval = setInterval(() => {
                     document.body.style.backgroundColor = isRed ? '#000' : '#880000';
                     isRed = !isRed;
                 }, 40);
 
-                // Останавливаем стробоскоп через 1.5 секунды, оставляя просто картинку
+                // Останавливаем стробоскоп через 1.5 сек
                 setTimeout(() => {
                     clearInterval(flashInterval);
                     document.body.style.backgroundColor = '#000';
                 }, 1500);
+
+                // ОСТАНАВЛИВАЕМ ТРЯСКУ ИЗОБРАЖЕНИЯ ЧЕРЕЗ 2 СЕКУНДЫ
+                setTimeout(() => {
+                    jumpscare.style.animation = 'none';
+                }, 2000);
 
             }, 12500);
         }
