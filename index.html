@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Симулятор Вскрытия Могилы</title>
+    <style>
+        /* === RESET & BASE STYLES === */
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #030305;
+            overflow: hidden;
+            font-family: 'Arial', sans-serif;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* === WARNING SCREEN === */
+        #warning-screen {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            z-index: 3000;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 20px;
+            box-sizing: border-box;
+            color: #fff;
+        }
+
+        .warning-content {
+            max-width: 600px;
+            background: #110000;
+            border: 2px solid #550000;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 0 50px rgba(255, 0, 0, 0.2);
+        }
+
+        .warning-content h1 {
+            color: #ff3333;
+            margin-top: 0;
+            font-size: 28px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .warning-content p {
+            font-size: 16px;
+            line-height: 1.5;
+            color: #ccc;
+            margin-bottom: 20px;
+        }
+
+        .warning-btn {
+            background: #440000;
+            color: #fff;
+            border: 1px solid #ff3333;
+            padding: 15px 30px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: all 0.3s;
+            text-transform: uppercase;
+        }
+
+        .warning-btn:hover {
+            background: #ff0000;
+            box-shadow: 0 0 20px #ff0000;
+            transform: scale(1.05);
+        }
+
+        /* === ENVIRONMENT (SKY, CLOUDS, FOG, LIGHTNING) === */
+        .sky {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(to bottom, #050508 0%, #111118 60%, #08080a 100%);
+            z-index: 0;
+        }
+
+        .moon {
+            position: absolute;
+            top: 10%;
+            right: 15%;
+            width: 90px;
+            height: 90px;
+            background: #f4f6e1;
+            border-radius: 50%;
+            box-shadow: 0 0 50px #f4f6e1, inset -15px -15px 20px rgba(0,0,0,0.3);
+            z-index: 1;
+        }
+
+        .clouds {
+            position: absolute;
+            top: -20%; left: -50%; width: 200%; height: 140%;
+            z-index: 2;
+            opacity: 0.55;
+            background: 
+                radial-gradient(circle at 15% 25%, rgba(45, 45, 55, 0.8) 10%, transparent 40%),
+                radial-gradient(circle at 75% 15%, rgba(25, 25, 30, 0.9) 15%, transparent 50%),
+                radial-gradient(circle at 50% 45%, rgba(35, 35, 45, 0.7) 20%, transparent 60%),
+                radial-gradient(circle at 30% 70%, rgba(20, 20, 25, 0.85) 15%, transparent 50%);
+            background-size: 100% 100%;
+            animation: cloudDrift 20s alternate infinite ease-in-out;
+            pointer-events: none;
+        }
+
+        @keyframes cloudDrift {
+            0% { transform: scale(1) translateX(0) translateY(0); }
+            100% { transform: scale(1.1) translateX(10%) translateY(-5%); }
+        }
+
+        .fog {
+            position: absolute;
+            bottom: 0; left: 0; width: 100%; height: 40%;
+            background: linear-gradient(to top, rgba(10, 10, 15, 0.95), transparent);
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        .lightning-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: #fff;
+            opacity: 0;
+            z-index: 999;
+            pointer-events: none;
+            animation: flashLight 12s infinite;
+        }
+
+        @keyframes flashLight {
+            0%, 91%, 93%, 95%, 100% { opacity: 0; }
+            92% { opacity: 0.8; }
+            94% { opacity: 0.3; }
+        }
+
+        /* === GRAVE SCENE WRAPPER === */
+        .scene-wrapper {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 5;
+        }
+
+        .grave-scene {
+            position: relative;
+            width: 400px;
+            height: 400px;
+            margin-top: 15vh;
+        }
+
+        @media (max-width: 500px) {
+            .grave-scene {
+                transform: scale(0.75);
+                margin-top: 5vh;
+            }
+        }
+
+        /* === GRAVE ELEMENTS === */
+        .hole {
+            position: absolute;
+            bottom: 50px;
+            left: 100px;
+            width: 200px;
+            height: 60px;
+            background: #020101;
+            border-radius: 50%;
+            z-index: 1;
+            box-shadow: inset 0 0 15px rgba(0,0,0,1);
+        }
+
+        .tombstone {
+            position: absolute;
+            bottom: 80px;
+            left: 120px;
+            width: 160px;
+            height: 220px;
+            background: linear-gradient(to bottom, #5a5c5f, #2c2d30);
+            border-radius: 80px 80px 0 0;
+            z-index: 2;
+            box-shadow: 
+                inset -5px -5px 20px rgba(0,0,0,0.6),
+                inset 5px 5px 10px rgba(255,255,255,0.1),
+                10px 15px 20px rgba(0,0,0,0.8);
+            text-align: center;
+            padding-top: 35px;
+            box-sizing: border-box;
+        }
+
+        .tombstone h1 {
+            margin: 0;
+            font-family: "Courier New", Courier, monospace;
+            font-size: 38px;
+            letter-spacing: 2px;
+            color: #111;
+            text-shadow: 1px 1px 1px #777, -1px -1px 1px #222;
+        }
+
+        .tombstone p {
+            margin: 10px 0 0 0;
+            font-family: "Courier New", Courier, monospace;
+            font-size: 14px;
+            font-weight: bold;
+            color: #111;
+            text-shadow: 1px 1px 1px #777;
+            line-height: 1.4;
+        }
+
+        .crack {
+            position: absolute;
+            top: 25px;
+            left: 40px;
+            width: 2px;
+            height: 50px;
+            background: #111;
+            transform: rotate(15deg);
+        }
+
+        .crack::after {
+            content: '';
+            position: absolute;
+            top: 40px;
+            left: -8px;
+            width: 2px;
+            height: 25px;
+            background: #111;
+            transform: rotate(-35deg);
+        }
+
+        /* === COFFIN === */
+        .coffin-wrapper {
+            position: absolute;
+            bottom: -220px; 
+            left: 140px;
+            width: 120px;
+            height: 220px;
+            z-index: 3;
+            transition: bottom 3s cubic-bezier(0.25, 0.1, 0.25, 1);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .coffin-shape {
+            clip-path: polygon(20% 0%, 80% 0%, 100% 25%, 80% 100%, 20% 100%, 0% 25%);
+        }
+
+        .coffin-base {
+            position: absolute;
+            width: 120px;
+            height: 220px;
+            background: #1a0d05;
+        }
+
+        .coffin-inside {
+            position: absolute;
+            width: 104px;
+            height: 204px;
+            background: #030000;
+            top: 8px; left: 8px;
+            box-shadow: inset 0 0 30px #000;
+            display: flex;
+            justify-content: center;
+        }
+
+        .coffin-lid {
+            position: absolute;
+            top: 0; left: 0;
+            width: 120px;
+            height: 220px;
+            background-color: #3e200c;
+            background-image: repeating-linear-gradient(to right, transparent 0px, transparent 4px, rgba(0,0,0,0.35) 5px, rgba(0,0,0,0.35) 8px);
+            z-index: 4;
+            transition: transform 1.5s ease-in, opacity 1.8s ease-in;
+            box-shadow: inset 0 0 15px rgba(0,0,0,0.9);
+        }
+
+        .eyes-container {
+            position: absolute;
+            top: 40px;
+            display: flex;
+            gap: 12px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .eye {
+            width: 8px;
+            height: 8px;
+            background: #ff0000;
+            border-radius: 50%;
+            box-shadow: 0 0 10px #ff0000, 0 0 20px #ff0000;
+            animation: blink 3s infinite;
+        }
+
+        @keyframes blink {
+            0%, 96%, 98%, 100% { transform: scaleY(1); }
+            97% { transform: scaleY(0.1); }
+        }
+
+        /* === DIRT MOUND === */
+        .dirt-front {
+            position: absolute;
+            bottom: 10px;
+            left: 40px;
+            width: 320px;
+            height: 100px;
+            background: #140d08;
+            border-radius: 50% 50% 10% 10%;
+            z-index: 5;
+            box-shadow: 
+                inset 0 25px 30px rgba(0,0,0,0.95), 
+                0 -5px 15px rgba(0,0,0,0.6);
+            background-image: 
+                radial-gradient(circle at 20% 30%, #0a0704 3px, transparent 4px),
+                radial-gradient(circle at 70% 60%, #0a0704 2px, transparent 3px),
+                radial-gradient(circle at 40% 80%, #1f140c 3px, transparent 4px),
+                radial-gradient(circle at 80% 20%, #1f140c 2px, transparent 3px);
+        }
+
+        .grass {
+            position: absolute;
+            background: #112200;
+            width: 4px;
+            border-radius: 50% 50% 0 0;
+            z-index: 6;
+        }
+        .g1 { bottom: 90px; left: 100px; height: 15px; transform: rotate(-20deg); }
+        .g2 { bottom: 95px; left: 105px; height: 22px; transform: rotate(5deg); }
+        .g3 { bottom: 85px; left: 220px; height: 18px; transform: rotate(15deg); }
+        .g4 { bottom: 80px; left: 260px; height: 12px; transform: rotate(-10deg); }
+
+        /* === INTERACTIVE SIGN === */
+        .sign-container {
+            position: absolute;
+            bottom: 55px;
+            left: 150px;
+            width: 100px;
+            height: 80px;
+            z-index: 7;
+            cursor: pointer;
+            transition: transform 0.6s cubic-bezier(0.55, 0.085, 0.68, 0.53), opacity 0.6s;
+        }
+
+        .sign-container:hover .sign-board {
+            color: #fff;
+            text-shadow: 0 0 8px rgba(255,255,255,0.5);
+            transform: rotate(-2deg) scale(1.05);
+        }
+
+        .sign-board {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            background: #5c3a21;
+            color: #ffcccc;
+            border: 2px solid #362213;
+            padding: 8px 0;
+            text-align: center;
+            font-family: 'Arial', sans-serif;
+            font-weight: 900;
+            font-size: 14px;
+            letter-spacing: 1px;
+            transform: rotate(-6deg);
+            box-shadow: 3px 4px 10px rgba(0,0,0,0.8);
+            z-index: 2;
+            transition: all 0.2s;
+        }
+
+        .sign-post {
+            position: absolute;
+            top: 35px;
+            left: 42px;
+            width: 12px;
+            height: 45px;
+            background: #422916;
+            border: 2px solid #362213;
+            border-top: none;
+            z-index: 1;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.7);
+        }
+
+        /* === ANIMATIONS === */
+        @keyframes rumble {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            20% { transform: translate(-2px, 0px) rotate(-1deg); }
+            40% { transform: translate(1px, -1px) rotate(1deg); }
+            60% { transform: translate(-1px, 2px) rotate(0deg); }
+            80% { transform: translate(2px, -1px) rotate(-1deg); }
+            100% { transform: translate(0px, 1px) rotate(0deg); }
+        }
+
+        /* === JUMPSCARE / IMAGE ROULETTE === */
+        #jumpscare {
+            position: fixed;
+            /* Делаем чуть больше 100% чтобы при тряске не было видно краев */
+            top: -5vh; left: -5vw; width: 110vw; height: 110vh;
+            background: #000;
+            z-index: 2000;
+            display: none;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #jumpscare.active {
+            display: flex;
+            animation: violentShake 0.05s infinite;
+        }
+
+        #scary-image {
+            width: 100%;
+            height: 100%;
+            object-fit: contain; /* Чтобы картинка влезла целиком */
+            pointer-events: none;
+        }
+
+        @keyframes violentShake {
+            0% { transform: translate(20px, 20px) rotate(2deg); }
+            25% { transform: translate(-20px, -20px) rotate(-2deg); }
+            50% { transform: translate(20px, -20px) rotate(2deg); }
+            75% { transform: translate(-20px, 20px) rotate(-2deg); }
+            100% { transform: translate(20px, 20px) rotate(2deg); }
+        }
+
+    </style>
+</head>
+<body>
+
+    <!-- Предупреждающий экран -->
+    <div id="warning-screen">
+        <div class="warning-content">
+            <h1>Внимание!</h1>
+            <p>Этот сайт содержит <b>крайне пугающий, жестокий и шокирующий контент</b>. Это "рулетка" — вы можете увидеть как забавную картинку, так и то, что совершенно не предназначено для слабонервных.</p>
+            <p><i>Все изображения взяты из открытых источников (Google.com) исключительно в развлекательных целях. Ничего реального здесь нет, это всего лишь игра.</i></p>
+            <p>Нажимая кнопку ниже, вы подтверждаете, что готовы к просмотру на свой страх и риск.</p>
+            <button class="warning-btn" onclick="acceptWarning()">Я согласен(на) продолжить</button>
+        </div>
+    </div>
+
+    <!-- Environment Layer -->
+    <div class="sky"></div>
+    <div class="moon"></div>
+    <div class="clouds"></div>
+    <div class="lightning-overlay" id="lightning"></div>
+    
+    <!-- Main Interactive Scene -->
+    <div class="scene-wrapper">
+        <div class="grave-scene" id="grave-scene">
+            
+            <div class="hole"></div>
+            
+            <div class="tombstone" id="tombstone">
+                <div class="crack"></div>
+                <h1>R.I.P</h1>
+                <p>НЕ<br>БЕСПОКОИТЬ</p>
+            </div>
+
+            <div class="coffin-wrapper coffin-shape" id="coffin">
+                <div class="coffin-base coffin-shape"></div>
+                <div class="coffin-inside coffin-shape">
+                    <div class="eyes-container" id="coffin-eyes">
+                        <div class="eye"></div>
+                        <div class="eye"></div>
+                    </div>
+                </div>
+                <div class="coffin-lid coffin-shape" id="coffin-lid"></div>
+            </div>
+
+            <div class="dirt-front" id="dirt"></div>
+            <div class="grass g1" id="g1"></div>
+            <div class="grass g2" id="g2"></div>
+            <div class="grass g3" id="g3"></div>
+            <div class="grass g4" id="g4"></div>
+
+            <div class="sign-container" id="sign" onclick="startSimulation()">
+                <div class="sign-board">ЖМИ<br>СЮДА</div>
+                <div class="sign-post"></div>
+            </div>
+
+        </div>
+    </div>
+
+    <div class="fog"></div>
+
+    <!-- Контейнер скримера/рулетки -->
+    <div id="jumpscare">
+        <img id="scary-image" src="" alt="SURPRISE!">
+    </div>
+
+    <script>
+        // === МАССИВЫ ИЗОБРАЖЕНИЙ ===
+        const funnyImages = [
+            "https://i.pinimg.com/736x/08/3f/7e/083f7e20390cca811edce8784d1e6583.jpg",
+            "https://piximus.net/media/3486/funny-and-strange-people-2.jpg",
+            "https://i.ytimg.com/vi/SUDOUT43WSQ/hq720.jpg?sqp=-oaymwE7CK4FEIIDSFryq4qpAy0IARUAAAAAGAElAADIQj0AgKJD8AEB-AH-CYAC0AWKAgwIABABGCwgPyh_MA8=&rs=AOn4CLA7rrUIExmTUqlZyJphjqNjC26UVg",
+            "https://external-preview.redd.it/in-case-you-are-looking-for-brainrot-horror-fun-and-scary-v0-Zzl4YnY3dW90bW9mMYT7OJ3QtqV9oGAd5NrK9AKArwglTnCIDpOsuU42Gfn3.png?width=640&crop=smart&format=pjpg&auto=webp&s=4da490743c525f02d03437679bfebd02cf00f7b4",
+            "https://static.wikia.nocookie.net/roblox-skittles-nextbots/images/2/22/Ahhdog.jpeg/revision/latest/thumbnail/width/360/height/360?cb=20250308005658",
+            "https://www.syfy.com/sites/syfy/files/2024/11/mcdscst_uz002.jpg"
+        ];
+
+        const scaryImages = [
+            "https://images.steamusercontent.com/ugc/2460727253401665293/158DCDDF4995BB7DA9FB968EC3E6AB709E9917F1/?imw=637&imh=358&ima=fit&impolicy=Letterbox&imcolor=%23000000&letterbox=true",
+            "https://images.squarespace-cdn.com/content/v1/5e3dc4e54c6791067883b1bd/1604108183832-E274X6QWAHS2L1SYFQQP/pasted+image+0+%282%29.png",
+            "https://static0.srcdn.com/wordpress/wp-content/uploads/2025/01/the-ring-distorted-face-of-girl-in-closet.jpg?q=70&fit=crop&w=825&dpr=1",
+            "https://www.watchmojo.com/uploads/blipthumbs/VG-RP-Top10-Jump-Scares-In-Videogames-720p30_480.jpg",
+            "https://www.rollingstone.com/wp-content/uploads/2024/10/004_127c58.jpg?w=1581&h=1054&crop=1"
+        ];
+
+        const disturbingImages = [
+            "https://figures.semanticscholar.org/ec1e62821ee93101738303cd625cd97041aa728f/2-Figure1-1.png",
+            "https://www.omicsonline.org/articles-images/2157-7145-S3-002-g001.gif",
+            "https://c8.alamy.com/comp/2AGKE8X/mafia-murder-1992-2AGKE8X.jpg",
+            "https://madabouthorror.co.uk/wp-content/uploads/2022/08/life_size_dead_body_prop_stigmata_horror.jpg",
+            "https://www.criminalattorneyfortworth.com/wp-content/uploads/2021/01/fulgham1-3.jpg",
+            "https://figures.academia-assets.com/57230226/figure_005.jpg",
+            "https://figures.academia-assets.com/34636284/figure_007.jpg",
+            "https://cdn.medizzy.com/bzh_7gORQb3m_v2df_bURrs8Cz8=/800x586/img/posts/cd0ec841-c276-4330-8ec8-41c27643300f",
+            "https://citizenzoo.wordpress.com/wp-content/uploads/2009/03/iraq-dead-bodies.jpg?w=580"
+        ];
+
+        let selectedImageUrl = "";
+
+        // === ЛОГИКА ПРЕДУПРЕЖДЕНИЯ И ПРЕДЗАГРУЗКИ ===
+        function acceptWarning() {
+            // Убираем экран предупреждения
+            document.getElementById('warning-screen').style.display = 'none';
+            
+            // Выбираем случайную категорию, затем случайную картинку из неё
+            const categories = [funnyImages, scaryImages, disturbingImages];
+            const randomCategory = categories[Math.floor(Math.random() * categories.length)];
+            selectedImageUrl = randomCategory[Math.floor(Math.random() * randomCategory.length)];
+
+            // Предзагружаем картинку в фоне, чтобы в момент скримера не было белого экрана
+            const imgPreload = new Image();
+            imgPreload.src = selectedImageUrl;
+            
+            // Вставляем её в наш элемент скримера
+            document.getElementById('scary-image').src = selectedImageUrl;
+        }
+
+        // === ОСНОВНАЯ АНИМАЦИЯ (Без изменений таймингов!) ===
+        let isOpening = false;
+
+        function startSimulation() {
+            if (isOpening) return;
+            isOpening = true;
+
+            const sign = document.getElementById('sign');
+            const dirt = document.getElementById('dirt');
+            const grassElements = [
+                document.getElementById('g1'),
+                document.getElementById('g2'),
+                document.getElementById('g3'),
+                document.getElementById('g4')
+            ];
+            const tombstone = document.getElementById('tombstone');
+            const coffin = document.getElementById('coffin');
+            const coffinLid = document.getElementById('coffin-lid');
+            const coffinEyes = document.getElementById('coffin-eyes');
+            const jumpscare = document.getElementById('jumpscare');
+            const lightning = document.getElementById('lightning');
+
+            // 1. Пинаем табличку вниз
+            sign.style.transform = 'translate(-120px, 80px) rotate(-85deg)';
+            sign.style.opacity = '0';
+            sign.style.pointerEvents = 'none';
+
+            // 2. Начало дрожи
+            setTimeout(() => {
+                dirt.style.animation = 'rumble 0.1s infinite';
+                tombstone.style.animation = 'rumble 0.15s infinite';
+                grassElements.forEach(g => g.style.animation = 'rumble 0.1s infinite');
+            }, 600);
+
+            // 3. Гроб медленно поднимается
+            setTimeout(() => {
+                dirt.style.animation = 'rumble 0.3s infinite';
+                tombstone.style.animation = 'rumble 0.4s infinite';
+                coffin.style.bottom = '40px'; 
+            }, 3000);
+
+            // 4. Гроб замирает, гробовая тишина
+            setTimeout(() => {
+                dirt.style.animation = 'none';
+                tombstone.style.animation = 'none';
+                grassElements.forEach(g => g.style.animation = 'none');
+            }, 6000);
+
+            // 5. Крышка слегка сдвигается
+            setTimeout(() => {
+                coffinLid.style.transform = 'translateX(8px) translateY(2px) rotate(2deg)';
+            }, 7500);
+
+            // 6. Крышка съезжает полностью
+            setTimeout(() => {
+                coffinLid.style.transform = 'translateX(180px) translateY(100px) rotate(35deg)';
+                coffinLid.style.opacity = '0';
+            }, 9000);
+
+            // 7. Красные глаза загораются
+            setTimeout(() => {
+                coffinEyes.style.opacity = '1';
+            }, 10500);
+
+            // 8. СКРИМЕР (РУЛЕТКА КАРТИНОК)
+            setTimeout(() => {
+                // Выключаем молнии
+                lightning.style.display = 'none';
+                
+                // Включаем слой со случайной картинкой
+                document.body.style.backgroundColor = '#000';
+                jumpscare.classList.add('active');
+
+                // Эффект стробоскопа на фоне
+                let isRed = false;
+                let flashInterval = setInterval(() => {
+                    document.body.style.backgroundColor = isRed ? '#000' : '#880000';
+                    isRed = !isRed;
+                }, 40);
+
+                // Останавливаем стробоскоп через 1.5 секунды, оставляя просто картинку
+                setTimeout(() => {
+                    clearInterval(flashInterval);
+                    document.body.style.backgroundColor = '#000';
+                }, 1500);
+
+            }, 12500);
+        }
+    </script>
+</body>
+</html>
